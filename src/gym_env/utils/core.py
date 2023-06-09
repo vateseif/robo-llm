@@ -1,12 +1,14 @@
 import pygame
 import numpy as np
 import networkx as nx
+import seaborn as sns
+import colorcet as cc
 from time import sleep
 from itertools import product
 
 from typing import Optional, Tuple, Union
 
-
+color_palette = sns.color_palette(cc.glasbey, n_colors=3).as_hex() # TODO
 
 class EntityState:  # physical/external base state of all entities
   def __init__(self):
@@ -36,33 +38,36 @@ class Entity:  # properties and state of physical world entity
     # name
     self.name: str = ""
     # id
-    self.id: Optional[int] = None
+    self.i: Optional[int] = None
     # color TODO: randomize color
     self.color: Optional[Tuple[float]] = None
     # state
     self.state = EntityState()
     # size when drawing
     self.size = 50 # TODO 
+    # whether to draw entity
+    self.draw_entity = True
 
-  def draw(self, canvas: pygame.Surface):
+  def draw(self):
     # Draws the entity on the canvas
     pass
 
 
-
-
-    
-
 class Key(Entity):
-  def __init__(self, name):
+  def __init__(self, name, i):
     super().__init__()
+    # name
     self.name = name
+    # id
+    self.i = i
     # state
     self.state = EntityState()
     # color
-    self.color = (255, 0, 0) # red 
+    self.color = color_palette[self.i] # red 
 
-  def draw(self, canvas: pygame.Surface, pix_square_size):
+  def draw(self, canvas: pygame.Surface, pix_square_size: float):
+    # check whether to draw entity from parent class
+    if not self.draw_entity: return
     # Draw key as a rectangle
     pygame.draw.rect(
         canvas,
@@ -89,7 +94,9 @@ class Agent(Entity):  # properties of agent entities
     # script behavior to execute
     self.action_callback = None
 
-  def draw(self, canvas: pygame.Surface, pix_square_size):
+  def draw(self, canvas: pygame.Surface, pix_square_size: float):
+    # check whether to draw entity from parent class
+    if not self.draw_entity: return
     # draw agent as a circle
     pygame.draw.circle(
       canvas, 
@@ -98,19 +105,8 @@ class Agent(Entity):  # properties of agent entities
       pix_square_size/3
     )
 
-  def act(self, action):
-    # applies action to move robot
-    self.world.step(action)
-
-  def explore(self):
-    # returns the objects found in the room
-    print(f"""I found the following objects in the room:
-    {[(i, o.name) for i, o in enumerate(list(self.world.objects.keys()))]}
-    """)
-    return self.world.objects
-
-  def goto(self, entity: Union[int, str, Entity]):
-
+  def _get_entity(self, entity: Union[int, str, Entity]):
+    # gets correct entity given multi-type input
     if isinstance(entity, int):
       entity = list(self.world.objects.values())[entity]
     elif isinstance(entity, str):
@@ -120,7 +116,25 @@ class Agent(Entity):  # properties of agent entities
     else:
       raise Exception("entity provided is not any of these [int, str, Entity]")
 
-    # compute path from source to target (tuples)
+    return entity
+
+  def act(self, action):
+    # applies action to move robot
+    self.world.step(action)
+
+  def explore(self):
+    # returns the objects found in the room
+    print(f"""I found the following objects in the room:
+    {[(i, n) for i, n in enumerate(list(self.world.objects.keys()))]}
+    """)
+    #return self.world.objects
+
+  def goto(self, entity: Union[int, str, Entity]):
+
+    # get entity object
+    entity = self._get_entity(entity)
+
+    # compute path from source to target (tuples as input for dijkstra)
     path = nx.dijkstra_path(self.world.graph,
       tuple(self.state.p_pos), 
       tuple(entity.state.p_pos)
@@ -136,6 +150,32 @@ class Agent(Entity):  # properties of agent entities
 
     print(f"Agent is at same location as {entity.name}")
 
+  def pick(self, entity: Union[int, str, Entity]):
+    # for the moment it simply doesn't draw the entity that is picked up
+    entity = self._get_entity(entity)
+
+    # check that agent is at entity's location
+    if not np.array_equal(self.state.p_pos, entity.state.p_pos):
+      print("Agent is not at same location as entity")
+      return 
+
+    entity.draw_entity = False
+    print(f"Entity {entity.name} was picked up")
+
+  def drop(self, entity: Union[int, str, Entity]):
+    entity = self._get_entity(entity)
+
+    # check that entity was actually picked
+    if entity.draw_entity:
+      print(f"entity {entity.name} was not picked")
+      return
+
+    # update entity's position and draw it since it's dropped
+    entity.state.p_pos = self.state.p_pos
+    entity.draw_entity = True
+    print(f"entity {entity.name} was dropped at {list(entity.state.p_pos)}")
+
+    
 
 
 class World:
@@ -159,7 +199,7 @@ class World:
     self.agent: Agent = Agent(name="agent", world=self)
 
     # init objects
-    self.objects = {(name:=f"key_{i}") : Key(name=name) for i in range(1)}
+    self.objects = {(name:=f"key_{i}") : Key(name=name, i=i) for i in range(3)}
 
 
   def step(self, action: Union[int, np.ndarray]):
@@ -184,6 +224,7 @@ class World:
     # set random location of objects
     for obj in list(self.objects.values()):
       obj.state.p_pos = np.random.randint(0, self.size-1, (2, ))
+      obj.draw_entity = True
 
     return self._get_obs(), self._get_info()
 
