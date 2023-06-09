@@ -11,10 +11,10 @@ from gym_env.utils.core import World
 class GridWorldEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, size=10):
+    def __init__(self, render_mode=None, size=10, wait_time_s=0.2):
         
         # create world
-        self.world = World(size=size)
+        self.world = World(size=size, wait_time_s=wait_time_s)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -29,7 +29,7 @@ class GridWorldEnv(gym.Env):
         self.window = None
         self.clock = None
         self.window_size = 512  # The size of the PyGame window
-
+        self.wait_time_s = wait_time_s
         self.open_thread = False
         
 
@@ -71,9 +71,8 @@ class GridWorldEnv(gym.Env):
             sleep(wait_time_s)
 
     def run(self):
-        wait_time_s = 0.5
         # Create a background thread
-        self.thread = threading.Thread(target=self._run, args=(wait_time_s,))
+        self.thread = threading.Thread(target=self._run, args=(self.wait_time_s,))
         self.thread.daemon = True  # Set the thread as a daemon (will exit when the main program ends)
         # Start the background thread
         self.thread.start()

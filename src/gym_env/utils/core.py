@@ -1,8 +1,10 @@
 import pygame
 import numpy as np
+import networkx as nx
+from time import sleep
 from itertools import product
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 
 
@@ -47,12 +49,37 @@ class Entity:  # properties and state of physical world entity
     pass
 
 
+
+
+    
+
+class Key(Entity):
+  def __init__(self, name):
+    super().__init__()
+    self.name = name
+    # state
+    self.state = EntityState()
+    # color
+    self.color = (255, 0, 0) # red 
+
+  def draw(self, canvas: pygame.Surface, pix_square_size):
+    # Draw key as a rectangle
+    pygame.draw.rect(
+        canvas,
+        self.color,
+        pygame.Rect(
+            pix_square_size * self.state.p_pos,
+            (pix_square_size, pix_square_size),
+        ),
+    )
+     
+
 class Agent(Entity):  # properties of agent entities
   def __init__(self, name, world):
     super().__init__()
     self.name = name
     # the world the agent is in
-    self.world = world
+    self.world: World = world
     # state
     self.state = EntityState()
     # color
@@ -75,31 +102,44 @@ class Agent(Entity):  # properties of agent entities
     # applies action to move robot
     self.world.step(action)
 
-    
+  def explore(self):
+    # returns the objects found in the room
+    print(f"""I found the following objects in the room:
+    {[(i, o.name) for i, o in enumerate(list(self.world.objects.keys()))]}
+    """)
+    return self.world.objects
 
-class Key(Entity):
-  def __init__(self, name):
-    super().__init__()
-    self.name = name
-    # state
-    self.state = EntityState()
-    # color
-    self.color = (255, 0, 0) # red 
+  def goto(self, entity: Union[int, str, Entity]):
 
-  def draw(self, canvas: pygame.Surface, pix_square_size):
-    # Draw key as a rectangle
-    pygame.draw.rect(
-        canvas,
-        self.color,
-        pygame.Rect(
-            pix_square_size * self.state.p_pos,
-            (pix_square_size/3, pix_square_size/3),
-        ),
-    )
-     
+    if isinstance(entity, int):
+      entity = list(self.world.objects.values())[entity]
+    elif isinstance(entity, str):
+      entity = self.world.objects[entity]
+    elif isinstance(entity, Entity):
+      pass
+    else:
+      raise Exception("entity provided is not any of these [int, str, Entity]")
+
+    # compute path from source to target (tuples)
+    path = nx.dijkstra_path(self.world.graph,
+      tuple(self.state.p_pos), 
+      tuple(entity.state.p_pos)
+    )[1:] # remove source
+    # convert waypoints to np.array
+    path = [np.array(xy) for xy in path]
+
+    # compute needed action from current pos to next waypoint
+    for xy in path:
+      action = xy - self.state.p_pos
+      self.world.step(action)
+      sleep(self.world.wait_time_s) # sleep as in rendering
+
+    print(f"Agent is at same location as {entity.name}")
+
+
 
 class World:
-  def __init__(self, size=10) -> None:
+  def __init__(self, size, wait_time_s) -> None:
 
     # world dimensions
     self.size = size  # The size of the square grid
@@ -110,18 +150,25 @@ class World:
     self.pix_square_size = (
             self.window_size / self.size
         )  # The size of a single grid square in pixels
-    
+    # create navigation graph
+    self.graph = nx.grid_graph(dim=(size,size))
+    # wait time when updating state
+    self.wait_time_s = wait_time_s
 
     # init agent
     self.agent: Agent = Agent(name="agent", world=self)
 
     # init objects
-    self.objects = [Key(name="key")]
+    self.objects = {(name:=f"key_{i}") : Key(name=name) for i in range(1)}
 
 
-  def step(self, action):
-    # Map the action (element of {0,1,2,3}) to the direction we walk in
-    direction = self.agent.action._action_to_direction[action]
+  def step(self, action: Union[int, np.ndarray]):
+    if isinstance(action, int):
+      # Map the action (element of {0,1,2,3}) to the direction we walk in
+      direction = self.agent.action._action_to_direction[action]
+    else:
+      assert isinstance(action, np.ndarray), "action neither Int nor np.array"
+      direction = action
     # We use `np.clip` to make sure we don't leave the grid
     self.agent.state.p_pos = np.clip(
         self.agent.state.p_pos + direction, 0, self.size - 1
@@ -135,7 +182,7 @@ class World:
     # set random location of agent
     self.agent.state.p_pos = np.random.randint(0, self.size-1, (2,))
     # set random location of objects
-    for obj in self.objects:
+    for obj in list(self.objects.values()):
       obj.state.p_pos = np.random.randint(0, self.size-1, (2, ))
 
     return self._get_obs(), self._get_info()
@@ -143,7 +190,7 @@ class World:
 
   def _get_obs(self):
     # return position of agent and objects
-    return {entity.name: entity.state.p_pos for entity in [self.agent]+self.objects}
+    return {entity.name: entity.state.p_pos for entity in [self.agent]+list(self.objects.values())}
 
   def _get_info(self):
     # added this function to be conformed with gymnasium's way of doing
@@ -158,7 +205,7 @@ class World:
     canvas.fill((255, 255, 255))
 
     # draw agent and objects on canvas
-    for entity in [self.agent]+self.objects:
+    for entity in list(self.objects.values())+[self.agent]:
       entity.draw(canvas, self.pix_square_size)
 
     # draw delimiting edges of canvas
