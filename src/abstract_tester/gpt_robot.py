@@ -61,7 +61,7 @@ class GPTRobot():
         return result
     
     def apply_message(self, message_string):
-        if "FINISEHD" in message_string:
+        if "FINISHED" in message_string:
             return self.finished()
         if "EXPLORE" in message_string:
             # EXPLORE(roomname), extract roomname
@@ -79,6 +79,7 @@ class GPTRobot():
             # PUTDOWN(objectname), extract objectname
             objectname = message_string.split("PUTDOWN(")[1].split(")")[0]
             return self.robot_putdown(objectname)
-
+        else:
+            print("ERROR: unknown message: " + message_string)
 
 
