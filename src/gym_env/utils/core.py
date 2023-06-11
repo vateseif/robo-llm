@@ -123,6 +123,9 @@ class Agent(Entity):  # properties of agent entities
     self.world.step(action)
 
   def explore(self):
+    """
+    GPT function: returns id and name of objects in same room as agent
+    """
     # returns the objects found in the room
     print(f"""I found the following objects in the room:
     {[(i, n) for i, n in enumerate(list(self.world.objects.keys()))]}
@@ -130,7 +133,10 @@ class Agent(Entity):  # properties of agent entities
     #return self.world.objects
 
   def goto(self, entity: Union[int, str, Entity]):
-
+    """
+    GPT function: moves the robot to same location as entity.
+    The entity can be passed as its id, name or Entity object.
+    """
     # get entity object
     entity = self._get_entity(entity)
 
@@ -151,6 +157,9 @@ class Agent(Entity):  # properties of agent entities
     print(f"Agent is at same location as {entity.name}")
 
   def pick(self, entity: Union[int, str, Entity]):
+    """
+    GPT function: agent picks entity. It simply stops drawing the object
+    """
     # for the moment it simply doesn't draw the entity that is picked up
     entity = self._get_entity(entity)
 
@@ -163,6 +172,9 @@ class Agent(Entity):  # properties of agent entities
     print(f"Entity {entity.name} was picked up")
 
   def drop(self, entity: Union[int, str, Entity]):
+    """
+    GPT function: Agent drops entity at its location. It simply starts drawing again the entity
+    """
     entity = self._get_entity(entity)
 
     # check that entity was actually picked
