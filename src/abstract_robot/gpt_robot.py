@@ -37,7 +37,7 @@ class GPTRobot():
         self.task_message = task_message
         self.messages = [
                     {"role": "system", "content": SYSTEM_PROMPT_SIMPLE},
-                    {"role": "user", "content": "Please complete the following task: " + self.task_message + "\nAlways explain what you are doing and why (without naming the functions explicitely). Then in a new line call the API function of the robot."},
+                    {"role": "user", "content": "Please complete the following task: " + self.task_message + "\nAlways explain what you are doing and why (without naming the functions explicitely). Then in a new line call the API function of the robot. Call one API function at a time."},
                 ]
         self.robot_explore = robot_explore
         self.robot_pickup = robot_pickup
@@ -51,10 +51,16 @@ class GPTRobot():
         if self.messages == []:
             bot_answer = "EXPLORE()"
         completion = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages = self.messages,
             max_tokens=256,
         )
+        options = ['EXPLORE', 'PICKUP', 'MOVETO', 'PUTDOWN', 'FINISHED']
+        # if multiple options in completion.choices[0]
+        if len([option for option in options if option in completion.choices[0].message.content])>1:
+            print("retrying becuse multiuple API calls")
+            self.messages.append({"role": "user", "content": "Can't process that. Please only call one API function at a time. Please try again and give me only the next API call."})
+            return self.next_action()
         message_string = completion.choices[0].message.content
         # replace ' and " with empty string
         message_string = message_string.replace("'", "").replace('"', '')
@@ -64,8 +70,6 @@ class GPTRobot():
     
     def apply_message(self, message_string):
         print("gpt message:" + message_string)
-        if "FINISHED" in message_string:
-            return self.finished()
         if "EXPLORE" in message_string:
             # EXPLORE(roomname), extract roomname
             # roomname = message_string.split("EXPLORE(")[1].split(")")[0]
@@ -82,6 +86,8 @@ class GPTRobot():
             # PUTDOWN(objectname), extract objectname
             objectname = message_string.split("PUTDOWN(")[1].split(")")[0]
             return self.robot_putdown(objectname)
+        if "FINISHED" in message_string:
+            return self.finished()
         else:
             print("ERROR: unknown message: " + message_string)
 
