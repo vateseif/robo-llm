@@ -2,7 +2,7 @@ import openai
 from dotenv import load_dotenv
 import os
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = open(os.path.dirname(__file__) + '/openai.key', 'r').readline().rstrip()
 
 SYSTEM_PROMPT_FULL = """You are the cognitive center of a robot. This means, you have a task to complete and you can use the given API of the robot to complete the task. The robot will tell you if an API call failed or how it succeeded, so you can react to it.
 The robot acts in 2D, so no need to worry about the height coordinate.
@@ -51,7 +51,7 @@ class GPTRobot():
         if self.messages == []:
             bot_answer = "EXPLORE()"
         completion = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages = self.messages,
             max_tokens=256,
         )
