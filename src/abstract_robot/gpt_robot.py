@@ -37,7 +37,7 @@ class GPTRobot():
         self.task_message = task_message
         self.messages = [
                     {"role": "system", "content": SYSTEM_PROMPT_SIMPLE},
-                    {"role": "user", "content": "Please complete the following task: " + self.task_message + "\nAlways explain what you are doing and why before calling the API function of the robot."},
+                    {"role": "user", "content": "Please complete the following task: " + self.task_message + "\nAlways explain what you are doing and why (without naming the functions explicitely). Then in a new line call the API function of the robot."},
                 ]
         self.robot_explore = robot_explore
         self.robot_pickup = robot_pickup
@@ -56,11 +56,14 @@ class GPTRobot():
             max_tokens=256,
         )
         message_string = completion.choices[0].message.content
+        # replace ' and " with empty string
+        message_string = message_string.replace("'", "").replace('"', '')
         self.messages.append({"role": "assistant", "content": message_string})
         result = self.apply_message(message_string)
         return result
     
     def apply_message(self, message_string):
+        print("gpt message:" + message_string)
         if "FINISHED" in message_string:
             return self.finished()
         if "EXPLORE" in message_string:

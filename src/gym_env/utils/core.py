@@ -127,9 +127,12 @@ class Agent(Entity):  # properties of agent entities
     GPT function: returns id and name of objects in same room as agent
     """
     # returns the objects found in the room
-    print(f"""I found the following objects in the room:
-    {[(i, n) for i, n in enumerate(list(self.world.objects.keys()))]}
-    """)
+    # print(f"""I found the following objects in the room:
+    # {[(i, n) for i, n in enumerate(list(self.world.objects.keys()))]}
+    # """)
+    s = f"I found the following objects in the room: "
+    s += ", ".join([n for n in list(self.world.objects.keys())])
+    return s
     #return self.world.objects
 
   def goto(self, entity: Union[int, str, Entity]):
@@ -154,7 +157,7 @@ class Agent(Entity):  # properties of agent entities
       self.world.step(action)
       sleep(self.world.wait_time_s) # sleep as in rendering
 
-    print(f"Agent is at same location as {entity.name}")
+    return f"Agent is at same location as {entity.name}"
 
   def pick(self, entity: Union[int, str, Entity]):
     """
@@ -165,8 +168,7 @@ class Agent(Entity):  # properties of agent entities
 
     # check that agent is at entity's location
     if not np.array_equal(self.state.p_pos, entity.state.p_pos):
-      print("Agent is not at same location as entity")
-      return 
+      return "Cannot pick entity. Agent is not at entity's location."
 
     entity.draw_entity = False
     print(f"Entity {entity.name} was picked up")
@@ -179,13 +181,12 @@ class Agent(Entity):  # properties of agent entities
 
     # check that entity was actually picked
     if entity.draw_entity:
-      print(f"entity {entity.name} was not picked")
-      return
+      return f"entity {entity.name} was not picked. You need pick it first before dropping it."
 
     # update entity's position and draw it since it's dropped
     entity.state.p_pos = self.state.p_pos
     entity.draw_entity = True
-    print(f"entity {entity.name} was dropped at {list(entity.state.p_pos)}")
+    return f"entity {entity.name} was dropped."
 
     
 
