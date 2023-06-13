@@ -61,8 +61,8 @@ class Room(Entity):
     self.size = size
     # room vertices
     self.vtl, self.vbl, self.vbr, self.vtr = (np.array([0, 0]), np.array([0, size]), np.array([size, size]), np.array([size, 0]))
-    # door
-    self.door = Door(name+"_door", np.mean((self.vbl, self.vbr), 0), room=self) if not name.startswith("main") else None # main room has no door (u cannot escape)
+    # door, TODO: change door name
+    self.door = Door("door_0", np.mean((self.vbl, self.vbr), 0), room=self) if not name.startswith("main") else None # main room has no door (u cannot escape)
 
   def draw(self, canvas: pygame.Surface, pix_square_size: float):
     # draw delimiting edges of canvas
@@ -182,7 +182,7 @@ class Agent(Entity):  # properties of agent entities
     # {[(i, n) for i, n in enumerate(list(self.world.objects.keys()))]}
     # """)
     s = f"I found the following objects in the room: "
-    s += ", ".join([n for n in list(self.world.entities.keys())])
+    s += ", ".join([n for n in list(self.world.keys.keys())])
     return s
     #return self.world.objects
 
@@ -342,7 +342,7 @@ class World:
     # set random location of agent always in main_room
     self.agent.state.p_pos = np.random.randint(self.rooms['room_0'].size, self.size-1, (2,))
     # init first key always in main_room
-    self.keys['key_0'].state.p_pos = np.random.randint(self.rooms['room_0'].size-1, self.size-1, (2,))
+    self.keys['key_0'].state.p_pos = np.random.randint(self.rooms['room_0'].size, self.size-1, (2,))
     self.keys['key_0'].draw_entity = True
     self.keys['key_0'].room = self.rooms['main_room']
     # init second key always in room_0 
