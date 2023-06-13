@@ -2,7 +2,10 @@ import openai
 from dotenv import load_dotenv
 import os
 load_dotenv()
-openai.api_key = open(os.path.dirname(__file__) + '/openai.key', 'r').readline().rstrip()
+try:
+  openai.api_key = open(os.path.dirname(__file__) + '/openai.key', 'r').readline().rstrip()
+except:
+  openai.api_key = os.getenv("OPENAI_API_KEY")
 
 SYSTEM_PROMPT_FULL = """You are the cognitive center of a robot. This means, you have a task to complete and you can use the given API of the robot to complete the task. The robot will tell you if an API call failed or how it succeeded, so you can react to it.
 The robot acts in 2D, so no need to worry about the height coordinate.
