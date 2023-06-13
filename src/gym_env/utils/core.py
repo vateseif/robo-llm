@@ -52,14 +52,38 @@ class Entity:  # properties and state of physical world entity
     # Draws the entity on the canvas
     pass
 
+
+class Room(Entity):
+  def __init__(self, name:str, size:int):
+    # name
+    self.name = name
+    # room size (indicates how much to go down and left from top right point of main room)
+    self.size = size
+    # room vertices
+    self.vtl, self.vbl, self.vbr, self.vtr = (np.array([0, 0]), np.array([0, size]), np.array([size, size]), np.array([size, 0]))
+    # door
+    self.door = Door(name+"_door", np.mean((self.vbl, self.vbr), 0), room=self) if not name.startswith("main") else None # main room has no door (u cannot escape)
+
+  def draw(self, canvas: pygame.Surface, pix_square_size: float):
+    # draw delimiting edges of canvas
+    pygame.draw.line(canvas, 0, self.vtl*pix_square_size, self.vbl*pix_square_size, width=3)
+    pygame.draw.line(canvas, 0, self.vbl*pix_square_size, self.vbr*pix_square_size, width=3)
+    pygame.draw.line(canvas, 0, self.vbr*pix_square_size, self.vtr*pix_square_size, width=3)
+    pygame.draw.line(canvas, 0, self.vtr*pix_square_size, self.vtl*pix_square_size, width=3)
+    # draw door
+    if self.door is not None:
+      self.door.draw(canvas, pix_square_size)
+
 class Door(Entity):
-  def __init__(self, name: str, loc: np.ndarray):
+  def __init__(self, name: str, loc: np.ndarray, room: Room):
     super().__init__()
     self.name = name
     # location
     self.state.p_pos = loc
     # door always starts off closed
     self.open = False
+    # room
+    self.room = room
     # key that opens this door
     self.key: Key = None
     
@@ -76,27 +100,6 @@ class Door(Entity):
             (pix_square_size, pix_square_size),
         ),
     )
-
-class Room(Entity):
-  def __init__(self, name:str, size:int):
-    # name
-    self.name = name
-    # room size (indicates how much to go down and left from top right point of main room)
-    self.size = size
-    # room vertices
-    self.vtl, self.vbl, self.vbr, self.vtr = (np.array([0, 0]), np.array([0, size]), np.array([size, size]), np.array([size, 0]))
-    # door
-    self.door = Door(name+"_room", np.mean((self.vbl, self.vbr), 0)) if not name.startswith("main") else None # main room has no door (u cannot escape)
-
-  def draw(self, canvas: pygame.Surface, pix_square_size: float):
-    # draw delimiting edges of canvas
-    pygame.draw.line(canvas, 0, self.vtl*pix_square_size, self.vbl*pix_square_size, width=3)
-    pygame.draw.line(canvas, 0, self.vbl*pix_square_size, self.vbr*pix_square_size, width=3)
-    pygame.draw.line(canvas, 0, self.vbr*pix_square_size, self.vtr*pix_square_size, width=3)
-    pygame.draw.line(canvas, 0, self.vtr*pix_square_size, self.vtl*pix_square_size, width=3)
-    # draw door
-    if self.door is not None:
-      self.door.draw(canvas, pix_square_size)
 
 
 class Key(Entity):
@@ -174,11 +177,14 @@ class Agent(Entity):  # properties of agent entities
     """
     GPT function: returns id and name of keys in same room as agent
     """
-    # returns the keys found in the room
-    print(f"""I found the following entities in the room:
-    {[(i, n) for i, n in enumerate(list(self.world.entities.keys()))]}
-    """)
-    #return self.world.keys
+    # returns the objects found in the room
+    # print(f"""I found the following objects in the room:
+    # {[(i, n) for i, n in enumerate(list(self.world.objects.keys()))]}
+    # """)
+    s = f"I found the following objects in the room: "
+    s += ", ".join([n for n in list(self.world.entities.keys())])
+    return s
+    #return self.world.objects
 
   def goto(self, entity_name: str):
     """
@@ -189,6 +195,10 @@ class Agent(Entity):  # properties of agent entities
     entity = self.world.entities[entity_name]
     if isinstance(entity, Room): entity = entity.door
 
+    # check if it was a key and it was picked already
+    if isinstance(entity, Key) and not entity.draw_entity:
+      return f"{entity_name} was picked already."
+
     try:
       # compute path from source to target (tuples as input for dijkstra)
       path = nx.dijkstra_path(self.world.graph,
@@ -196,8 +206,7 @@ class Agent(Entity):  # properties of agent entities
         tuple(entity.state.p_pos)
       )[1:] # remove source
     except:
-      print(f"{entity.name} is not accesible because you didn't open {entity.room.name} yet")
-      return
+      return f"{entity.name} is not accesible because you didn't open {entity.room.door.name} yet"
     
     # convert waypoints to np.array
     path = [np.array(xy) for xy in path]
@@ -208,7 +217,7 @@ class Agent(Entity):  # properties of agent entities
       self.world.step(action)
       sleep(self.world.wait_time_s) # sleep as in rendering
 
-    print(f"Agent is at same location as {entity.name}")
+    return f"You have moved correctly to the same location as {entity.name}."
 
   def pick(self, key_name: str):
     """
@@ -218,13 +227,16 @@ class Agent(Entity):  # properties of agent entities
     #entity = self._get_entity(entity)
     key = self.world.keys[key_name]
 
+    # check if key was already picked
+    if not key.draw_entity:
+      return f"{key_name} is already picked."
+
     # check that agent is at entity's location
     if not np.array_equal(self.state.p_pos, key.state.p_pos):
-      print("Agent is not at same location as entity")
-      return 
+      return f"Cannot pick {key_name} because you are not at the same location."
 
     key.draw_entity = False
-    print(f"Entity {key.name} was picked up")
+    return f"{key_name} was picked up"
 
   def drop(self, key_name: str):
     """
@@ -234,33 +246,37 @@ class Agent(Entity):  # properties of agent entities
 
     # check that entity was actually picked
     if key.draw_entity:
-      print(f"entity {key.name} was not picked")
-      return
+      return f"entity {key.name} was not picked. You need pick it first before dropping it."
 
     # update entity's position and draw it since it's dropped
     key.state.p_pos = self.state.p_pos
     key.draw_entity = True
-    print(f"entity {key.name} was dropped at {list(key.state.p_pos)}")
+    return f"entity {key.name} was dropped."
 
-  def open(self, room_name:str, key_name:str):
+  def open(self, door_name:str, key_name:str):
     """
     GPT function: opens a room givent its name and the name of the key. Thekey has to be picked
     """
-    room = self.world.entities[room_name]
+    door = self.world.entities[door_name]
     key = self.world.keys[key_name]
-    # check that entity was actually picked
+    # check that key was actually picked
     if key.draw_entity:
-      print(f"entity {key.name} was not picked")
-      return
+      return f"{key.name} cannot be used to open {door_name} because it was not picked"
+
+    # check that the key is the one that opens the dorr
+    if door.key.name != key_name:
+      return f"{key_name} cannot be used to open {door_name}. You have to open {door_name} with {door.key.name}."
     
     # goto room
-    self.goto(room_name)
+    self.goto(door_name)
     # open door
-    room.door.open = True
+    door.open = True
     # add new room to navigation graph
-    room_graph = nx.grid_graph(dim=(room.size, room.size))
+    room_graph = nx.grid_graph(dim=(door.room.size, door.room.size))
     self.world.graph = nx.compose(self.world.graph, room_graph)
-    self.world.graph.add_edge(tuple(room.door.state.p_pos), tuple(room.door.state.p_pos-np.array([0, 1])))
+    self.world.graph.add_edge(tuple(door.state.p_pos), tuple(door.state.p_pos-np.array([0, 1])))
+
+    return f"{door_name} has been opened correctly"
 
 class World:
   def __init__(self, size, wait_time_s) -> None:
@@ -289,6 +305,8 @@ class World:
 
     # store all entities
     self.entities = self.rooms | self.keys
+    # add doors to entity
+    self.entities.update({r.door.name: r.door for r in self.rooms.values() if r.door != None})
 
     # create navigation graph
     self.graph = self._init_graph()
@@ -322,7 +340,7 @@ class World:
     np.random.seed(seed)
 
     # set random location of agent always in main_room
-    self.agent.state.p_pos = np.random.randint(self.rooms['room_0'].size-1, self.size-1, (2,))
+    self.agent.state.p_pos = np.random.randint(self.rooms['room_0'].size, self.size-1, (2,))
     # init first key always in main_room
     self.keys['key_0'].state.p_pos = np.random.randint(self.rooms['room_0'].size-1, self.size-1, (2,))
     self.keys['key_0'].draw_entity = True
@@ -331,7 +349,7 @@ class World:
     self.keys['key_1'].state.p_pos = np.random.randint(0, self.rooms['room_0'].size-1, (2,))
     self.keys['key_1'].draw_entity = True
     self.keys['key_1'].room = self.rooms['room_0']
-    self.rooms['room_0'].door.key = self.keys['key_1']
+    self.rooms['room_0'].door.key = self.keys['key_0']
     self.rooms['room_0'].door.open = False
     # set random location of all keys apart from first 2
     for obj in list(self.keys.values())[2:]:
