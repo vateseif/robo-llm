@@ -1,3 +1,4 @@
+import os
 import pygame
 import threading
 import numpy as np
@@ -7,6 +8,8 @@ from time import sleep
 
 from gym_env.utils.core import World
 
+# set pygame window always on corner of screen
+os.environ['SDL_VIDEO_WINDOW_POS'] = str(0) + "," + str(0)
 
 class GridWorldEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
