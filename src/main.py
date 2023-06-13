@@ -16,6 +16,7 @@ explore = agent.explore
 pickup = agent.pick
 moveto = agent.goto
 putdown = agent.drop
+opendoor = agent.open
 isfinished = False
 def finished():
     global isfinished
@@ -24,9 +25,10 @@ def finished():
     isfinished = True
 
 
-brain = GPTRobot(task_message, explore, pickup, moveto, putdown, finished)
+brain = GPTRobot(task_message, explore, pickup, moveto, putdown, opendoor, finished)
 last_robot_message = None
 while not isfinished:
     print("next action")
     last_robot_message = brain.next_action(last_robot_message)
-    print(last_robot_message)
+    if last_robot_message != None:
+      print(f"\33[92m {last_robot_message} \033[0m")
