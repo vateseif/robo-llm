@@ -62,7 +62,10 @@ class Room(Entity):
     # room vertices
     self.vtl, self.vbl, self.vbr, self.vtr = (np.array([0, 0]), np.array([0, size]), np.array([size, size]), np.array([size, 0]))
     # door, TODO: change door name
-    self.door = Door("door_0", np.mean((self.vbl, self.vbr), 0), room=self) if not name.startswith("main") else None # main room has no door (u cannot escape)
+    if name.startswith("main"):
+      self.door = Door(name="main_door", loc=np.mean((self.vbl, self.vbr), 0), room=self, is_open=True)
+    else:
+      self.door = Door(name="door_0", loc=np.mean((self.vbl, self.vbr), 0), room=self, is_open=False) # main room has no door (u cannot escape)
 
   def draw(self, canvas: pygame.Surface, pix_square_size: float):
     # draw delimiting edges of canvas
@@ -71,22 +74,21 @@ class Room(Entity):
     pygame.draw.line(canvas, 0, self.vbr*pix_square_size, self.vtr*pix_square_size, width=3)
     pygame.draw.line(canvas, 0, self.vtr*pix_square_size, self.vtl*pix_square_size, width=3)
     # draw door
-    if self.door is not None:
-      self.door.draw(canvas, pix_square_size)
+    self.door.draw(canvas, pix_square_size)
 
 class Door(Entity):
-  def __init__(self, name: str, loc: np.ndarray, room: Room):
+  def __init__(self, name: str, loc: np.ndarray, room: Room, is_open: bool):
     super().__init__()
     self.name = name
     # location
     self.state.p_pos = loc
     # door always starts off closed
-    self.open = False
+    self.open = is_open
     # room
     self.room = room
     # key that opens this door
     self.key: Key = None
-    
+
 
   def draw(self, canvas: pygame.Surface, pix_square_size: float):
     # if door is open color it white
@@ -178,13 +180,11 @@ class Agent(Entity):  # properties of agent entities
     GPT function: returns id and name of keys in same room as agent
     """
     # returns the objects found in the room
-    # print(f"""I found the following objects in the room:
-    # {[(i, n) for i, n in enumerate(list(self.world.objects.keys()))]}
-    # """)
+    # returns a key if in main room or if it's in an open room 
+    # otherwise it returns the door of the closed room
     s = f"I found the following objects in the room: "
-    s += ", ".join([n for n in list(self.world.keys.keys())])
+    s += ", ".join([k.name if k.room.door.open else k.room.door.name for k in list(self.world.keys.values())])
     return s
-    #return self.world.objects
 
   def goto(self, entity_name: str):
     """
@@ -306,7 +306,7 @@ class World:
     # store all entities
     self.entities = self.rooms | self.keys
     # add doors to entity
-    self.entities.update({r.door.name: r.door for r in self.rooms.values() if r.door != None})
+    self.entities.update({r.door.name: r.door for r in self.rooms.values() if not r.door.name.startswith("main")})
 
     # create navigation graph
     self.graph = self._init_graph()
