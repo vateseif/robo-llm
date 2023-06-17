@@ -319,7 +319,7 @@ class World:
 
   def random_pos(self, dimensions):
     # returns a random position within the dimensions
-    return np.random.randint(dimensions[0], dimensions[2]), np.random.randint(dimensions[1], dimensions[3])
+    return np.array([np.random.randint(dimensions[0], dimensions[2]), np.random.randint(dimensions[1], dimensions[3])])
 
   def __init__(self, size, wait_time_s, cfg) -> None:
 
@@ -348,7 +348,8 @@ class World:
     n_rooms = len(cfg.rooms)
     room_size = self.size // n_rooms
     for i,room in enumerate(cfg.rooms):
-      dimensions = (room_size*i, room_size*i, room_size*(i+1), room_size*(i+1))
+      if room.name == "Main": continue
+      dimensions = (room_size*(i-1), 0, room_size*i, room_size)
       roomname = room.name
       self.rooms.update({roomname : Room(roomname, dimensions=dimensions)})
     for room in cfg.rooms:
@@ -373,6 +374,9 @@ class World:
 
     # create navigation graph
     self.graph = self._init_graph()
+
+    # set random location of agent always in main_room
+    self.agent.state.p_pos = np.random.randint(self.size//2, self.size-1, (2,))
 
   def _init_graph(self):
     # create navigation graph
