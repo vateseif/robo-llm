@@ -7,3 +7,4 @@ seaborn==0.12.2
 colorcet==3.0.1
 gymnasium==0.28.1
 python-dotenv==1.0.0
+hydra-core
