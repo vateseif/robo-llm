@@ -56,7 +56,7 @@ class GPTRobot():
         if self.messages == []:
             bot_answer = "EXPLORE()"
         completion = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4",
             messages = self.messages,
             max_tokens=256,
         )

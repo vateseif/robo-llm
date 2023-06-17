@@ -54,13 +54,14 @@ class Entity:  # properties and state of physical world entity
 
 
 class Room(Entity):
-  def __init__(self, name:str, size:int):
+  def __init__(self, name:str, dimensions):
     # name
     self.name = name
     # room size (indicates how much to go down and left from top right point of main room)
-    self.size = size
+    # self.size = size
     # room vertices
-    self.vtl, self.vbl, self.vbr, self.vtr = (np.array([0, 0]), np.array([0, size]), np.array([size, size]), np.array([size, 0]))
+    xa, ya, xb, yb = dimensions
+    self.vtl, self.vbl, self.vbr, self.vtr = (np.array([xa, ya]), np.array([xa, yb]), np.array([xb, yb]), np.array([xb, ya]))
     # door, TODO: change door name
     if name.startswith("main"):
       self.door = Door(name="main_door", loc=np.mean((self.vbl, self.vbr), 0), room=self, is_open=True)
@@ -182,7 +183,7 @@ class Agent(Entity):  # properties of agent entities
     # returns the objects found in the room
     # returns a key if in main room or if it's in an open room 
     # otherwise it returns the door of the closed room
-    s = f"I found the following objects in the room: "
+    s = f"I found the following objects in the open rooms: "
     s += ", ".join([k.name if k.room.door.open else k.room.door.name for k in list(self.world.keys.values())])
     return s
 
@@ -279,11 +280,12 @@ class Agent(Entity):  # properties of agent entities
     return f"{door_name} has been opened correctly"
 
 class World:
-  def __init__(self, size, wait_time_s) -> None:
+  def __init__(self, cfg, wait_time_s) -> None:
 
     # world dimensions
-    self.size = size  # The size of the square grid
-    self.window_size = 512
+    self.size = cfg.size
+    # self.size = size  # The size of the square grid
+    self.window_size = 1024
     self.vertices = list(product([0, self.window_size], 
                               [0, self.window_size])
               ) # list of coordinates of world vertices
@@ -297,7 +299,11 @@ class World:
     self.agent: Agent = Agent(name="agent", world=self)
 
     # create rooms
-    self.rooms = {(name:="main_room") : Room(name, size=size)} # room that contains all other rooms
+    self.rooms = {(name:="main_room") : Room(name, dimensions=(0,0,self.size,self.size))} # room that contains all other rooms
+    for room in cfg.rooms:
+      dimensions = room.dimensions
+      name = room.name
+      self.rooms.update({name : Room(name, dimensions=dimensions)})
     self.rooms.update({(name:=f"room_{i}") : Room(name, size=size//3) for i in range(1)})
 
     # init keys
@@ -336,6 +342,8 @@ class World:
 
 
   def reset(self, seed=None):
+    # out of date
+    throw NotImplementedError("out of date")
     # random seed
     np.random.seed(seed)
 

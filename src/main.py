@@ -10,7 +10,8 @@ env.run()
 # get agent
 agent = env.world.agent
 
-task_message = "Put key_0 on key_1"
+# task_message = "Put key_0 on key_1"
+task_message = input("Please enter the task message: ")
 
 explore = agent.explore
 pickup = agent.pick
