@@ -161,4 +161,4 @@ cython_debug/
 
 
 # openai key
-openai.key
+*.key
