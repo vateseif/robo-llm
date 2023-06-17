@@ -1,0 +1,19 @@
+# config.yaml
+rooms:
+  - name: Main
+    # objects is an empty list
+    objects: []
+    keys:
+      - name: KeyA
+        forroom: Room1
+  - name: Room1
+    objects:
+      - name: Chair
+      - name: Ball
+    keys:
+      - name: KeyB
+        forroom: Room2
+  - name: Room2
+    objects:
+      - name: Table
+    keys: []

@@ -14,10 +14,10 @@ os.environ['SDL_VIDEO_WINDOW_POS'] = str(0) + "," + str(0)
 class GridWorldEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, size=10, wait_time_s=0.2):
+    def __init__(self, render_mode=None, size=10, wait_time_s=0.2, cfg=None):
         
         # create world
-        self.world = World(size=size, wait_time_s=wait_time_s)
+        self.world = World(size=size, wait_time_s=wait_time_s, cfg=cfg)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode

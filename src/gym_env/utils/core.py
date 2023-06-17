@@ -106,7 +106,7 @@ class Door(Entity):
 
 
 class Key(Entity):
-  def __init__(self, name, i):
+  def __init__(self, name, i, loc: np.ndarray, room: Room):
     super().__init__()
     # name
     self.name = name
@@ -114,10 +114,11 @@ class Key(Entity):
     self.i = i
     # state
     self.state = EntityState()
+    self.state.p_pos = loc
     # color
     self.color = color_palette[self.i] # red 
     # room
-    self.room: Room = None
+    self.room: Room = room
 
   def draw(self, canvas: pygame.Surface, pix_square_size: float):
     # check whether to draw entity from parent class
@@ -132,6 +133,34 @@ class Key(Entity):
         ),
     )
      
+class GeneralObject(Entity):
+  def __init__(self, name, i, loc: np.ndarray, room: Room):
+    super().__init__()
+    # name
+    self.name = name
+    # id
+    self.i = i
+    # state
+    self.state = EntityState()
+    self.state.p_pos = loc
+    # color
+    self.color = color_palette[self.i] # red 
+    # room
+    self.room: Room = room
+
+  def draw(self, canvas: pygame.Surface, pix_square_size: float):
+    # check whether to draw entity from parent class
+    if not self.draw_entity: return
+    # Draw object as a rectangle
+    pygame.draw.rect(
+        canvas,
+        self.color,
+        pygame.Rect(
+            pix_square_size * self.state.p_pos,
+            (pix_square_size, pix_square_size),
+        ),
+    )
+
 
 class Agent(Entity):  # properties of agent entities
   def __init__(self, name, world):
@@ -184,7 +213,8 @@ class Agent(Entity):  # properties of agent entities
     # returns a key if in main room or if it's in an open room 
     # otherwise it returns the door of the closed room
     s = f"I found the following objects in the open rooms: "
-    s += ", ".join([k.name if k.room.door.open else k.room.door.name for k in list(self.world.keys.values())])
+    objectlist = list(self.world.keys.values()) + list(self.world.objects.values())
+    s += ", ".join([k.name if k.room.door.open else k.room.door.name for k in objectlist])
     return s
 
   def goto(self, entity_name: str):
@@ -280,10 +310,16 @@ class Agent(Entity):  # properties of agent entities
     return f"{door_name} has been opened correctly"
 
 class World:
-  def __init__(self, cfg, wait_time_s) -> None:
+
+  def random_pos(self, dimensions):
+    # returns a random position within the dimensions
+    return np.random.randint(dimensions[0], dimensions[2]), np.random.randint(dimensions[1], dimensions[3])
+
+  def __init__(self, size, wait_time_s, cfg) -> None:
 
     # world dimensions
-    self.size = cfg.size
+    self.size = size
+    self.half_size = size // 2
     # self.size = size  # The size of the square grid
     self.window_size = 1024
     self.vertices = list(product([0, self.window_size], 
@@ -300,14 +336,29 @@ class World:
 
     # create rooms
     self.rooms = {(name:="main_room") : Room(name, dimensions=(0,0,self.size,self.size))} # room that contains all other rooms
+    self.keys = {}
+    self.objects = {}
+    id_counter = 0
+    n_rooms = len(cfg.rooms)
+    room_size = self.size // n_rooms
+    for i,room in enumerate(cfg.rooms):
+      dimensions = (room_size*i, room_size*i, room_size*(i+1), room_size*(i+1))
+      roomname = room.name
+      self.rooms.update({name : Room(roomname, dimensions=dimensions)})
     for room in cfg.rooms:
-      dimensions = room.dimensions
-      name = room.name
-      self.rooms.update({name : Room(name, dimensions=dimensions)})
-    self.rooms.update({(name:=f"room_{i}") : Room(name, size=size//3) for i in range(1)})
+      for key in room.keys:
+        self.keys.update({key.name : Key(name=key.name, i=id_counter, loc=self.random_pos(dimensions), room=self.rooms[roomname])})
+        self.rooms[roomname].door.key = self.keys[key.name]
+        id_counter += 1
+      for obj in room.objects:
+        self.objects.update({obj.name : GeneralObject(name=obj.name, i=id_counter, loc=self.random_pos(dimensions), room=self.rooms[roomname])})
+
+
+    # self.rooms.update({(name:=f"room_{i}") : Room(name, size=size//3) for i in range(1)})
 
     # init keys
-    self.keys = {(name:=f"key_{i}") : Key(name=name, i=i) for i in range(3)}
+
+    # self.keys = {(name:=f"key_{i}") : Key(name=name, i=i, loc=) for i in range(3)}
 
     # store all entities
     self.entities = self.rooms | self.keys
@@ -343,7 +394,7 @@ class World:
 
   def reset(self, seed=None):
     # out of date
-    throw NotImplementedError("out of date")
+    raise NotImplementedError("out of date")
     # random seed
     np.random.seed(seed)
 
