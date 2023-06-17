@@ -61,6 +61,8 @@ class Room(Entity):
     # self.size = size
     # room vertices
     xa, ya, xb, yb = dimensions
+    self.sizey = yb-ya
+    self.sizex = xb-xa
     self.vtl, self.vbl, self.vbr, self.vtr = (np.array([xa, ya]), np.array([xa, yb]), np.array([xb, yb]), np.array([xb, ya]))
     # door, TODO: change door name
     if name.startswith("main"):
@@ -303,7 +305,7 @@ class Agent(Entity):  # properties of agent entities
     # open door
     door.open = True
     # add new room to navigation graph
-    room_graph = nx.grid_graph(dim=(door.room.size, door.room.size))
+    room_graph = nx.grid_graph(dim=(door.room.sizex, door.room.sizey))
     self.world.graph = nx.compose(self.world.graph, room_graph)
     self.world.graph.add_edge(tuple(door.state.p_pos), tuple(door.state.p_pos-np.array([0, 1])))
 
@@ -344,9 +346,9 @@ class World:
     for i,room in enumerate(cfg.rooms):
       dimensions = (room_size*i, room_size*i, room_size*(i+1), room_size*(i+1))
       roomname = room.name
-      self.rooms.update({name : Room(roomname, dimensions=dimensions)})
+      self.rooms.update({roomname : Room(roomname, dimensions=dimensions)})
     for room in cfg.rooms:
-      for key in room.keys:
+      for key in room.doorkeys:
         self.keys.update({key.name : Key(name=key.name, i=id_counter, loc=self.random_pos(dimensions), room=self.rooms[roomname])})
         self.rooms[roomname].door.key = self.keys[key.name]
         id_counter += 1
@@ -374,7 +376,7 @@ class World:
     # remove nodes of closed rooms
     for room in self.rooms.values():
       if room.name.startswith("main"): continue
-      room_nodes = product(list(range(room.size)), list(range(room.size)))
+      room_nodes = product(list(range(room.sizex)), list(range(room.sizey)))
       for node in room_nodes:
         graph.remove_node(node)
     return graph

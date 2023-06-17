@@ -4,7 +4,7 @@ import time
 import hydra
 from omegaconf import DictConfig
 
-@hydra.main(version_base=None, config_path="configs", config_name="simple_room2")
+@hydra.main(version_base=None, config_path="../configs", config_name="simple_room")
 def run(cfg : DictConfig) -> None:
     print("starting")
     # init env
@@ -16,7 +16,7 @@ def run(cfg : DictConfig) -> None:
     agent = env.world.agent
 
     # task_message = "Put key_0 on key_1"
-    task_message = input("Please enter the task message: ")
+    task_message = input("Please enter the task message: ")
 
     explore = agent.explore
     pickup = agent.pick
@@ -37,7 +37,7 @@ def run(cfg : DictConfig) -> None:
         print("next action")
         last_robot_message = brain.next_action(last_robot_message)
         if last_robot_message != None:
-        print(f"\33[92m {last_robot_message} \033[0m")
+            print(f"\33[92m {last_robot_message} \033[0m")
 
 
 if __name__ == "__main__":
