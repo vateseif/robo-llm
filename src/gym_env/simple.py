@@ -34,6 +34,11 @@ class GridWorldEnv(gym.Env):
         self.window_size = 512  # The size of the PyGame window
         self.wait_time_s = wait_time_s
         self.open_thread = False
+
+        # open thread
+        self.open_thread = True
+        if self.render_mode == "human":
+            self._render_frame()
         
 
     def _get_obs(self):
