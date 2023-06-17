@@ -1,6 +1,6 @@
 # config.yaml
 rooms:
-  - name: Main
+  - name: main_room
     # objects is an empty list
     objects: []
     doorkeys:

@@ -60,6 +60,7 @@ class Room(Entity):
     # room size (indicates how much to go down and left from top right point of main room)
     # self.size = size
     # room vertices
+    self.dimensions = dimensions
     xa, ya, xb, yb = dimensions
     self.sizey = yb-ya
     self.sizex = xb-xa
@@ -68,7 +69,7 @@ class Room(Entity):
     if name.startswith("main"):
       self.door = Door(name="main_door", loc=np.mean((self.vbl, self.vbr), 0), room=self, is_open=True)
     else:
-      self.door = Door(name="door_0", loc=np.mean((self.vbl, self.vbr), 0), room=self, is_open=False) # main room has no door (u cannot escape)
+      self.door = Door(name= "Door_"+self.name, loc=np.mean((self.vbl, self.vbr), 0), room=self, is_open=False) # main room has no door (u cannot escape)
 
     # navigation graph
     self.graph = nx.grid_graph(dim=(range(xa, xb), range(ya, yb)))
@@ -111,7 +112,7 @@ class Door(Entity):
 
 
 class Key(Entity):
-  def __init__(self, name, i, loc: np.ndarray, room: Room):
+  def __init__(self, name, i, loc: np.ndarray, inroom: Room, forroom: Room):
     super().__init__()
     # name
     self.name = name
@@ -123,7 +124,8 @@ class Key(Entity):
     # color
     self.color = color_palette[self.i] # red 
     # room
-    self.room: Room = room
+    self.inroom: Room = inroom
+    self.forroom: Room = forroom
 
   def draw(self, canvas: pygame.Surface, pix_square_size: float):
     # check whether to draw entity from parent class
@@ -217,8 +219,27 @@ class Agent(Entity):  # properties of agent entities
     # returns the objects found in the room
     # returns a key if in main room or if it's in an open room 
     # otherwise it returns the door of the closed room
-    s = f"I found the following objects in the open rooms: "
+    s = f"I found the following keys in the open rooms: "
+    for key in self.world.keys.values():
+      if key.inroom.door.open:
+        s += f"{key.name}, "
+    s = s[:-2] + ". "
+    if len([obj for obj in self.world.objects.values() if obj.room.door.open]) > 0:  
+      s += f"The following objects were found: "
+      for obj in self.world.objects.values():
+        if obj.room.door.open:
+          s += f"{obj.name}, "
+      s = s[:-2] + ". "
+    s += f"The following doors are closed: "
+    for room in self.world.rooms.values():
+      if not room.door.open:
+        s += f"{room.door.name}, "
+    s = s[:-2] + ". "
+    return s
+
+
     objectlist = list(self.world.keys.values()) + list(self.world.objects.values())
+  
     s += ", ".join([k.name if k.room.door.open else k.room.door.name for k in objectlist])
     return s
 
@@ -242,7 +263,10 @@ class Agent(Entity):  # properties of agent entities
         tuple(entity.state.p_pos)
       )[1:] # remove source
     except:
-      return f"{entity.name} is not accesible because you didn't open {entity.room.door.name} yet"
+      try:
+        return f"{entity.name} is not accesible because you didn't open {entity.room.door.name} yet"
+      except:
+        return f"{entity.name} is not accesible because you didn't open {entity.inroom.door.name} yet"
     
     # convert waypoints to np.array
     path = [np.array(xy) for xy in path]
@@ -255,39 +279,46 @@ class Agent(Entity):  # properties of agent entities
 
     return f"You have moved correctly to the same location as {entity.name}."
 
-  def pick(self, key_name: str):
+  def pick(self, obj_name: str):
     """
     GPT function: agent picks entity. It simply stops drawing the object
     """
     # for the moment it simply doesn't draw the entity that is picked up
     #entity = self._get_entity(entity)
-    key = self.world.keys[key_name]
+
+    if obj_name in self.world.keys.keys():
+      obj = self.world.keys[obj_name]
+    else:
+      obj = self.world.objects[obj_name]
 
     # check if key was already picked
-    if not key.draw_entity:
-      return f"{key_name} is already picked."
+    if not obj.draw_entity:
+      return f"{obj_name} is already picked."
 
     # check that agent is at entity's location
-    if not np.array_equal(self.state.p_pos, key.state.p_pos):
-      return f"Cannot pick {key_name} because you are not at the same location."
+    if not np.array_equal(self.state.p_pos, obj.state.p_pos):
+      return f"Cannot pick {obj_name} because you are not at the same location."
 
-    key.draw_entity = False
-    return f"{key_name} was picked up"
+    obj.draw_entity = False
+    return f"{obj_name} was picked up"
 
-  def drop(self, key_name: str):
+  def drop(self, obj_name: str):
     """
     GPT function: Agent drops entity at its location. It simply starts drawing again the entity
     """
-    key = self.world.keys[key_name]
+    if obj_name in self.world.keys.keys():
+      obj = self.world.keys[obj_name]
+    else:
+      obj = self.world.objects[obj_name]
 
     # check that entity was actually picked
-    if key.draw_entity:
-      return f"entity {key.name} was not picked. You need pick it first before dropping it."
+    if obj.draw_entity:
+      return f"entity {obj.name} was not picked. You need pick it first before dropping it."
 
     # update entity's position and draw it since it's dropped
-    key.state.p_pos = self.state.p_pos
-    key.draw_entity = True
-    return f"entity {key.name} was dropped."
+    obj.state.p_pos = self.state.p_pos
+    obj.draw_entity = True
+    return f"entity {obj.name} was dropped."
 
   def open(self, door_name:str, key_name:str):
     """
@@ -341,21 +372,23 @@ class World:
     self.agent: Agent = Agent(name="agent", world=self)
 
     # create rooms
-    self.rooms = {(name:="main_room") : Room(name, dimensions=(0,0,self.size,self.size))} # room that contains all other rooms
+    self.rooms = {(name:="main_room") : Room(name, dimensions=(0,self.size//2,self.size,self.size))} # room that contains all other rooms
     self.keys = {}
     self.objects = {}
     id_counter = 0
     n_rooms = len(cfg.rooms)
     room_size = self.size // n_rooms
     for i,room in enumerate(cfg.rooms):
-      if room.name == "Main": continue
-      dimensions = (room_size*(i-1), 0, room_size*i, room_size)
+      if room.name == "main_room": continue
+      dimensions = (room_size*(i-1), 0, room_size*i, self.size//2)
       roomname = room.name
       self.rooms.update({roomname : Room(roomname, dimensions=dimensions)})
     for room in cfg.rooms:
+      roomname = room.name
+      dimensions = self.rooms[roomname].dimensions
       for key in room.doorkeys:
-        self.keys.update({key.name : Key(name=key.name, i=id_counter, loc=self.random_pos(dimensions), room=self.rooms[roomname])})
-        self.rooms[roomname].door.key = self.keys[key.name]
+        self.keys.update({key.name : Key(name=key.name, i=id_counter, loc=self.random_pos(dimensions), inroom=self.rooms[roomname], forroom=self.rooms[key.forroom])})
+        self.rooms[key.forroom].door.key = self.keys[key.name]
         id_counter += 1
       for obj in room.objects:
         self.objects.update({obj.name : GeneralObject(name=obj.name, i=id_counter, loc=self.random_pos(dimensions), room=self.rooms[roomname])})
@@ -368,7 +401,7 @@ class World:
     # self.keys = {(name:=f"key_{i}") : Key(name=name, i=i, loc=) for i in range(3)}
 
     # store all entities
-    self.entities = self.rooms | self.keys
+    self.entities = self.rooms | self.keys | self.objects
     # add doors to entity
     self.entities.update({r.door.name: r.door for r in self.rooms.values() if not r.door.name.startswith("main")})
 
@@ -454,11 +487,29 @@ class World:
     # draw keys
     for obj in self.keys.values():
       obj.draw(canvas, self.pix_square_size)
+      # draw name of key
+      font = pygame.font.Font('freesansbold.ttf', 18)
+      text = font.render(obj.name, True, (0, 0, 0))
+      textRect = text.get_rect()
+      textRect.center = (obj.state.p_pos[0]*self.pix_square_size, obj.state.p_pos[1]*self.pix_square_size)
+      canvas.blit(text, textRect)
+
     # draw rooms
     for room in self.rooms.values():
       room.draw(canvas, self.pix_square_size)
     # draw agent
     self.agent.draw(canvas, self.pix_square_size)
+
+    for obj in self.objects.values():
+      # plot the objects with name labels
+      obj.draw(canvas, self.pix_square_size)
+      # draw name of object
+      font = pygame.font.Font('freesansbold.ttf', 18)
+      text = font.render(obj.name, True, (0, 0, 0))
+      textRect = text.get_rect()
+      textRect.center = (obj.state.p_pos[0]*self.pix_square_size, obj.state.p_pos[1]*self.pix_square_size)
+      canvas.blit(text, textRect)
+
 
     return canvas
 
