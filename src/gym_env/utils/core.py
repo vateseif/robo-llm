@@ -70,6 +70,9 @@ class Room(Entity):
     else:
       self.door = Door(name="door_0", loc=np.mean((self.vbl, self.vbr), 0), room=self, is_open=False) # main room has no door (u cannot escape)
 
+    # navigation graph
+    self.graph = nx.grid_graph(dim=(range(xa, xb), range(ya, yb)))
+
   def draw(self, canvas: pygame.Surface, pix_square_size: float):
     # draw delimiting edges of canvas
     pygame.draw.line(canvas, 0, self.vtl*pix_square_size, self.vbl*pix_square_size, width=3)
@@ -305,7 +308,8 @@ class Agent(Entity):  # properties of agent entities
     # open door
     door.open = True
     # add new room to navigation graph
-    room_graph = nx.grid_graph(dim=(door.room.sizex, door.room.sizey))
+    #room_graph = nx.grid_graph(dim=(door.room.sizex, door.room.sizey))
+    room_graph = door.room.graph
     self.world.graph = nx.compose(self.world.graph, room_graph)
     self.world.graph.add_edge(tuple(door.state.p_pos), tuple(door.state.p_pos-np.array([0, 1])))
 
@@ -376,7 +380,8 @@ class World:
     # remove nodes of closed rooms
     for room in self.rooms.values():
       if room.name.startswith("main"): continue
-      room_nodes = product(list(range(room.sizex)), list(range(room.sizey)))
+      #room_nodes = product(list(range(room.sizex)), list(range(room.sizey)))
+      room_nodes = room.graph.nodes
       for node in room_nodes:
         graph.remove_node(node)
     return graph
