@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 try:
-  openai.api_key = open(os.path.dirname(__file__) + '/openai.key', 'r').readline().rstrip()
+  openai.api_key = open(os.path.dirname(__file__) + '/gpt4.key', 'r').readline().rstrip()
 except:
   openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -104,7 +104,7 @@ FUNCTIONS = [
       },
       {
         "name": "finished",
-        "description": "Stops the robots and closes the simulation",
+        "description": "Robot finishes because it has solved the task",
         "parameters": {
           "type":"object",
           "properties": {}
@@ -132,15 +132,20 @@ class GPTRobot():
         if robot_answer is not None:
             self.messages.append({"role": "user", "content": robot_answer})
         completion = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo-0613",
+            model="gpt-4-0613",
             messages = self.messages,
             functions=FUNCTIONS,
             max_tokens=256,
         )
         
-        fn = completion.choices[0].message["function_call"].name
-        args = completion.choices[0].message["function_call"].arguments
-        message_string = fn + args
+        try:
+          fn = completion.choices[0].message["function_call"].name
+          args = completion.choices[0].message["function_call"].arguments
+          message_string = fn + args
+        except:
+          print("Retrying...")
+          return self.next_action()
+           
 
         #print message
         print('\033[91m' + message_string + '\033[0m')
